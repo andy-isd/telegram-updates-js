@@ -9,6 +9,7 @@ const { NewMessage } = require('telegram/events');
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
 const apiHash = process.env.TELEGRAM_API_HASH?.trim();
 const phoneNumber = process.env.PHONE_NUMBER?.trim();
+const forceSMS = process.env.TELEGRAM_FORCE_SMS === 'true';
 const storageDir = path.join(__dirname, 'storage');
 const sessionFile = path.join(storageDir, 'session.dat');
 const channelUsername = process.env.CHANNEL_USERNAME?.trim();  // Channel username or ID
@@ -137,7 +138,7 @@ async function signIn() {
         console.log(`Requesting login code for ${maskPhoneNumber(phoneNumber)}...`);
         await client.start({
             phoneNumber: phoneNumber,
-            forceSMS: true,
+            forceSMS: forceSMS,
             phoneCode: async (isCodeViaApp) => {
                 const delivery = isCodeViaApp ? 'Telegram app' : 'SMS or another login method';
                 const code = await ask(`Enter the Telegram code from ${delivery}: `);
