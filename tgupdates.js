@@ -129,10 +129,9 @@ async function signIn() {
         console.log("Getting login code...");
         await client.start({
             phoneNumber: phoneNumber,
-            forceSMS: true,
             phoneCode: async (isCodeViaApp) => {
                 const via = isCodeViaApp ? 'Telegram app' : 'SMS';
-                const code = await ask(`Enter the Telegram code (sent via ${via}): `);
+                const code = await ask(`Enter the Telegram code (check your ${via}): `);
                 if (code === '') {
                     throw new Error("Code is empty");
                 }
