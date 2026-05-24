@@ -1,3 +1,7 @@
+if (typeof crypto === 'undefined') {
+    const nodeCrypto = require('crypto');
+    global.crypto = nodeCrypto.webcrypto || nodeCrypto;
+}
 require('dotenv').config();
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
