@@ -9,17 +9,17 @@ const { NewMessage } = require('telegram/events');
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const phoneNumber = process.env.PHONE_NUMBER;
-const sessionFile = 'storage/session.dat';
+const storageDir = path.join(__dirname, 'storage');
+const sessionFile = path.join(storageDir, 'session.dat');
 const channelUsername = process.env.CHANNEL_USERNAME;  // Нікнейм каналу або ID
 
-const folderPath = path.join(__dirname, 'storage/' + channelUsername);
-if (!fs.existsSync(folderPath)) fs.mkdir(folderPath, (err) => {
-    if (err) {
-        console.error('Error creating folder:', err);
-    } else {
-        console.log('Folder created successfully at', folderPath);
-    }
-});
+if (!apiId || !apiHash || !phoneNumber || !channelUsername) {
+    console.error('Заповніть TELEGRAM_API_ID, TELEGRAM_API_HASH, PHONE_NUMBER і CHANNEL_USERNAME в .env');
+    process.exit(1);
+}
+
+const folderPath = path.join(storageDir, channelUsername);
+fs.mkdirSync(folderPath, { recursive: true });
 
 function removeCircularReferences() {
     const seen = new Set();
@@ -34,50 +34,69 @@ function removeCircularReferences() {
     };
 }
 
-// Перевірка на існування збереженої сесії
-let stringSession = new StringSession('');
-if (fs.existsSync(sessionFile)) {
-    stringSession = new StringSession(fs.readFileSync(sessionFile, 'utf8'));
+function loadSessionString() {
+    if (!fs.existsSync(sessionFile)) {
+        return '';
+    }
+
+    return fs.readFileSync(sessionFile, 'utf8').trim();
 }
 
-// Створення TelegramClient
-const client = new TelegramClient(stringSession, apiId, apiHash, {
-    connectionRetries: 5,
-});
+function saveSession() {
+    fs.writeFileSync(sessionFile, client.session.save(), 'utf8');
+    console.log("Сесія збережена в файл.");
+}
 
-// Підключення до клієнта
-async function initializeClient() {
+const savedSession = loadSessionString();
+
+function createClient(sessionString) {
+    return new TelegramClient(new StringSession(sessionString), apiId, apiHash, {
+        connectionRetries: 5,
+    });
+}
+
+let client = createClient(savedSession);
+
+async function ask(question) {
+    const readline = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    return new Promise((resolve) => {
+        readline.question(question, (answer) => {
+            readline.close();
+            resolve(answer.trim());
+        });
+    });
+}
+
+// Підключення до клієнта зі збереженою сесією
+async function connectWithSavedSession() {
     try {
-        // Підключаємо клієнт
         console.log("Підключення до Telegram...");
         await client.connect();
         console.log("Клієнт підключено успішно.");
 
-        // Перевірка на наявність client.connection
-        if (client.connection && client.connection.dcId) {
-            const dc = client.connection.dcId;
-            console.log("Data Center ID:", dc);
-        } else {
-            console.error("Client connection or dcId is not available.");
-        }
-
-        // Отримання користувача
         const me = await client.getMe();
         console.log(`Логін: ${me.username}`);
 
-        // Підписка на оновлення каналу
-        await subscribeToChannel();
-
-        // Збереження сесії в файл після успішного підключення
-        fs.writeFileSync(sessionFile, client.session.save(), 'utf8');
-        console.log("Сесія збережена в файл.");
+        saveSession();
+        return true;
 
     } catch (error) {
-        console.error("Помилка при підключенні:", error);
-        if (error instanceof Error) {
-            // Спробуємо отримати деталі помилки
-            console.error("Error details:", error.stack);
+        console.error("Помилка при підключенні зі збереженою сесією:", error);
+
+        try {
+            await client.disconnect();
+        } catch (_) {}
+
+        if (fs.existsSync(sessionFile)) {
+            fs.unlinkSync(sessionFile);
+            console.error("Збережена сесія видалена. Потрібна повторна авторизація.");
         }
+
+        return false;
     }
 }
 
@@ -93,7 +112,7 @@ async function subscribeToChannel() {
         client.addEventHandler(async (event) => {
             const message = event.message;
             const timestamp = Math.floor(Date.now() / 1000);
-            const filename = `storage/${channelUsername}/event_${timestamp}.json`;
+            const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(event.message, removeCircularReferences(), 4), 'utf8');
             //console.log(`Автор: ${message.senderId}`);
             console.log(`Текст: ${message.text}`);
@@ -107,28 +126,24 @@ async function subscribeToChannel() {
 // Підтвердження коду для входу, якщо це перший запуск
 async function signIn() {
     try {
-        // Оновлений метод для авторизації з phoneCode
         console.log("Отримання коду для входу...");
         await client.start({
             phoneNumber: phoneNumber,
             phoneCode: async () => {
-                const readline = require('readline').createInterface({
-                    input: process.stdin,
-                    output: process.stdout
-                });
-                return new Promise((resolve, reject) => {
-                    readline.question('Введіть код з SMS: ', (code) => {
-                        if (code.trim() === '') {
-                            console.error("Код не може бути порожнім!");
-                            readline.close();
-                            reject(new Error("Код порожній"));
-                            return;
-                        }
-                        console.log(`Введений код: ${code}`);
-                        readline.close();
-                        resolve(code);
-                    });
-                });
+                const code = await ask('Введіть код з Telegram: ');
+                if (code === '') {
+                    throw new Error("Код порожній");
+                }
+
+                return code;
+            },
+            password: async () => {
+                const password = await ask('Введіть пароль 2FA: ');
+                if (password === '') {
+                    throw new Error("Пароль порожній");
+                }
+
+                return password;
             },
             onError: (error) => {
                 console.error("Помилка під час авторизації:", error);
@@ -136,21 +151,38 @@ async function signIn() {
         });
 
         console.log("Успішно увійшли!");
-        await initializeClient();
+        const me = await client.getMe();
+        console.log(`Логін: ${me.username}`);
+        saveSession();
+        return true;
     } catch (error) {
         console.error("Помилка при вході:", error);
+        return false;
     }
 }
 
 // Перевірка чи вже є збережена сесія, і якщо ні - авторизація
 async function checkSession() {
-    if (stringSession.session) {
+    let isReady = false;
+
+    if (savedSession.length > 0) {
         console.log("Сесія знайдена. Підключаємо...");
-        await initializeClient();
+        isReady = await connectWithSavedSession();
     } else {
         console.log("Сесія не знайдена. Виконуємо авторизацію...");
-        await signIn();
     }
+
+    if (!isReady) {
+        client = createClient('');
+        isReady = await signIn();
+    }
+
+    if (!isReady) {
+        process.exitCode = 1;
+        return;
+    }
+
+    await subscribeToChannel();
 }
 
 checkSession();
