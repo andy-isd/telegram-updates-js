@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "telegram": "2.26.21"
+    "telegram": "^2.26.16"
   }
 }
