@@ -163,7 +163,13 @@ async function signIn() {
         saveSession();
         return true;
     } catch (error) {
-        console.error("Sign-in error:", error);
+        if (error.errorMessage === 'FLOOD' && error.seconds) {
+            const minutes = Math.ceil(error.seconds / 60);
+            console.error(`\nTelegram rate limit hit. Too many login attempts.`);
+            console.error(`Wait ${error.seconds} seconds (≈${minutes} min) before trying again.\n`);
+        } else {
+            console.error("Sign-in error:", error);
+        }
         return false;
     }
 }
