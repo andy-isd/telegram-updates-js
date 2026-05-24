@@ -5,16 +5,16 @@ const fs = require('fs');
 const path = require('path');
 const { NewMessage } = require('telegram/events');
 
-// Отримуємо значення з .env
+// Read values from .env
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const phoneNumber = process.env.PHONE_NUMBER;
 const storageDir = path.join(__dirname, 'storage');
 const sessionFile = path.join(storageDir, 'session.dat');
-const channelUsername = process.env.CHANNEL_USERNAME;  // Нікнейм каналу або ID
+const channelUsername = process.env.CHANNEL_USERNAME;  // Channel username or ID
 
 if (!apiId || !apiHash || !phoneNumber || !channelUsername) {
-    console.error('Заповніть TELEGRAM_API_ID, TELEGRAM_API_HASH, PHONE_NUMBER і CHANNEL_USERNAME в .env');
+    console.error('Set TELEGRAM_API_ID, TELEGRAM_API_HASH, PHONE_NUMBER, and CHANNEL_USERNAME in .env');
     process.exit(1);
 }
 
@@ -26,7 +26,7 @@ function removeCircularReferences() {
     return function (key, value) {
         if (typeof value === 'object' && value !== null) {
             if (seen.has(value)) {
-                return undefined; // Якщо посилання вже є, повертаємо undefined
+                return undefined; // Skip values that were already serialized.
             }
             seen.add(value);
         }
@@ -44,7 +44,7 @@ function loadSessionString() {
 
 function saveSession() {
     fs.writeFileSync(sessionFile, client.session.save(), 'utf8');
-    console.log("Сесія збережена в файл.");
+    console.log("Session saved to file.");
 }
 
 const savedSession = loadSessionString();
@@ -71,21 +71,21 @@ async function ask(question) {
     });
 }
 
-// Підключення до клієнта зі збереженою сесією
+// Connect using a saved session.
 async function connectWithSavedSession() {
     try {
-        console.log("Підключення до Telegram...");
+        console.log("Connecting to Telegram...");
         await client.connect();
-        console.log("Клієнт підключено успішно.");
+        console.log("Client connected successfully.");
 
         const me = await client.getMe();
-        console.log(`Логін: ${me.username}`);
+        console.log(`Username: ${me.username}`);
 
         saveSession();
         return true;
 
     } catch (error) {
-        console.error("Помилка при підключенні зі збереженою сесією:", error);
+        console.error("Error connecting with the saved session:", error);
 
         try {
             await client.disconnect();
@@ -93,83 +93,83 @@ async function connectWithSavedSession() {
 
         if (fs.existsSync(sessionFile)) {
             fs.unlinkSync(sessionFile);
-            console.error("Збережена сесія видалена. Потрібна повторна авторизація.");
+            console.error("Saved session was removed. Reauthorization is required.");
         }
 
         return false;
     }
 }
 
-// Підписка на оновлення каналу
+// Subscribe to channel updates.
 async function subscribeToChannel() {
     try {
-        // Отримання об'єкта каналу
+        // Get the channel entity.
         const channel = await client.getEntity(channelUsername);
-        console.log(`Підключено до каналу: ${channel.title}`);
-        console.log(`ID каналу: ${channel.id}`);
+        console.log(`Connected to channel: ${channel.title}`);
+        console.log(`Channel ID: ${channel.id}`);
 
-        // Обробка нових повідомлень
+        // Handle new messages.
         client.addEventHandler(async (event) => {
             const message = event.message;
             const timestamp = Math.floor(Date.now() / 1000);
             const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(event.message, removeCircularReferences(), 4), 'utf8');
-            //console.log(`Автор: ${message.senderId}`);
-            console.log(`Текст: ${message.text}`);
+            //console.log(`Author: ${message.senderId}`);
+            console.log(`Text: ${message.text}`);
         }, new NewMessage({ chats: [channel.id] }));
 
     } catch (error) {
-        console.error("Помилка під час підключення до каналу:", error);
+        console.error("Error while connecting to the channel:", error);
     }
 }
 
-// Підтвердження коду для входу, якщо це перший запуск
+// Confirm the login code on the first run.
 async function signIn() {
     try {
-        console.log("Отримання коду для входу...");
+        console.log("Getting login code...");
         await client.start({
             phoneNumber: phoneNumber,
             phoneCode: async () => {
-                const code = await ask('Введіть код з Telegram: ');
+                const code = await ask('Enter the Telegram code: ');
                 if (code === '') {
-                    throw new Error("Код порожній");
+                    throw new Error("Code is empty");
                 }
 
                 return code;
             },
             password: async () => {
-                const password = await ask('Введіть пароль 2FA: ');
+                const password = await ask('Enter the 2FA password: ');
                 if (password === '') {
-                    throw new Error("Пароль порожній");
+                    throw new Error("Password is empty");
                 }
 
                 return password;
             },
             onError: (error) => {
-                console.error("Помилка під час авторизації:", error);
+                console.error("Authorization error:", error);
             }
         });
 
-        console.log("Успішно увійшли!");
+        console.log("Signed in successfully!");
         const me = await client.getMe();
-        console.log(`Логін: ${me.username}`);
+        console.log(`Username: ${me.username}`);
         saveSession();
         return true;
     } catch (error) {
-        console.error("Помилка при вході:", error);
+        console.error("Sign-in error:", error);
         return false;
     }
 }
 
-// Перевірка чи вже є збережена сесія, і якщо ні - авторизація
+// Check for a saved session; authorize if none exists.
 async function checkSession() {
     let isReady = false;
 
     if (savedSession.length > 0) {
-        console.log("Сесія знайдена. Підключаємо...");
+        console.log("Session found. Connecting...");
         isReady = await connectWithSavedSession();
     } else {
-        console.log("Сесія не знайдена. Виконуємо авторизацію...");
+        console.log("Session not found. Starting authorization...");
     }
 
     if (!isReady) {

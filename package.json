@@ -1,0 +1,14 @@
+{
+  "name": "telegram-updates-js",
+  "version": "1.0.0",
+  "description": "Get updates from a Telegram channel in a Node.js daemon.",
+  "main": "tgupdates.js",
+  "scripts": {
+    "start": "node tgupdates.js",
+    "check": "node --check tgupdates.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "telegram": "^2.26.22"
+  }
+}
