@@ -136,7 +136,7 @@ async function signIn() {
     try {
         console.log(`Requesting login code for ${maskPhoneNumber(phoneNumber)}...`);
         await client.start({
-            phoneNumber: async () => phoneNumber,
+            phoneNumber: phoneNumber,
             phoneCode: async () => {
                 const code = await ask('Enter the Telegram code: ');
                 if (code === '') {
