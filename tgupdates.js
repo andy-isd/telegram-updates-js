@@ -127,9 +127,11 @@ async function subscribeToChannel() {
 async function signIn() {
     try {
         console.log("Getting login code...");
+        console.log("[AUTH] Calling client.start()...");
         await client.start({
             phoneNumber: phoneNumber,
             phoneCode: async (isCodeViaApp) => {
+                console.log(`[AUTH] phoneCode callback called, isCodeViaApp=${isCodeViaApp}`);
                 const via = isCodeViaApp ? 'Telegram app' : 'SMS';
                 const code = await ask(`Enter the Telegram code (check your ${via}): `);
                 if (code === '') {
