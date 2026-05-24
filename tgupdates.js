@@ -9,7 +9,6 @@ const { NewMessage } = require('telegram/events');
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
 const apiHash = process.env.TELEGRAM_API_HASH?.trim();
 const phoneNumber = process.env.PHONE_NUMBER?.trim();
-const forceSMS = process.env.TELEGRAM_FORCE_SMS === 'true';
 const storageDir = path.join(__dirname, 'storage');
 const sessionFile = path.join(storageDir, 'session.dat');
 const channelUsername = process.env.CHANNEL_USERNAME?.trim();  // Channel username or ID
@@ -72,14 +71,6 @@ async function ask(question) {
     });
 }
 
-function maskPhoneNumber(value) {
-    if (value.length <= 4) {
-        return '****';
-    }
-
-    return `${value.slice(0, 3)}****${value.slice(-2)}`;
-}
-
 // Connect using a saved session.
 async function connectWithSavedSession() {
     try {
@@ -135,13 +126,11 @@ async function subscribeToChannel() {
 // Confirm the login code on the first run.
 async function signIn() {
     try {
-        console.log(`Requesting login code for ${maskPhoneNumber(phoneNumber)}...`);
+        console.log("Getting login code...");
         await client.start({
             phoneNumber: phoneNumber,
-            forceSMS: forceSMS,
-            phoneCode: async (isCodeViaApp) => {
-                const delivery = isCodeViaApp ? 'Telegram app' : 'SMS or another login method';
-                const code = await ask(`Enter the Telegram code from ${delivery}: `);
+            phoneCode: async () => {
+                const code = await ask('Enter the Telegram code: ');
                 if (code === '') {
                     throw new Error("Code is empty");
                 }
