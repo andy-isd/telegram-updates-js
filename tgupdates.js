@@ -55,7 +55,7 @@ function createClient(sessionString) {
     });
 }
 
-let client = createClient(savedSession);
+let client;
 
 async function ask(question) {
     const readline = require('readline').createInterface({
@@ -175,6 +175,7 @@ async function checkSession() {
 
     if (savedSession.length > 0) {
         console.log("Session found. Connecting...");
+        client = createClient(savedSession);
         isReady = await connectWithSavedSession();
     } else {
         console.log("Session not found. Starting authorization...");
