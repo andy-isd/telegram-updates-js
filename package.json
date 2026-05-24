@@ -5,7 +5,9 @@
   "main": "tgupdates.js",
   "scripts": {
     "start": "node tgupdates.js",
-    "check": "node --check tgupdates.js"
+    "check": "node --check tgupdates.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 delete ecosystem.config.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

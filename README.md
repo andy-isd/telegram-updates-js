@@ -12,7 +12,7 @@ npm i telegram
 node tgupdates.js
 
 # run with pm2
-pm2 start ecosystem.js
+npm run pm2:start
 
 # stop with pm2
-pm2 delete ecosystem.js
+npm run pm2:stop

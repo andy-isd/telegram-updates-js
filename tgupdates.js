@@ -7,11 +7,11 @@ const { NewMessage } = require('telegram/events');
 
 // Read values from .env
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
-const apiHash = process.env.TELEGRAM_API_HASH;
-const phoneNumber = process.env.PHONE_NUMBER;
+const apiHash = process.env.TELEGRAM_API_HASH?.trim();
+const phoneNumber = process.env.PHONE_NUMBER?.trim();
 const storageDir = path.join(__dirname, 'storage');
 const sessionFile = path.join(storageDir, 'session.dat');
-const channelUsername = process.env.CHANNEL_USERNAME;  // Channel username or ID
+const channelUsername = process.env.CHANNEL_USERNAME?.trim();  // Channel username or ID
 
 if (!apiId || !apiHash || !phoneNumber || !channelUsername) {
     console.error('Set TELEGRAM_API_ID, TELEGRAM_API_HASH, PHONE_NUMBER, and CHANNEL_USERNAME in .env');
@@ -71,6 +71,14 @@ async function ask(question) {
     });
 }
 
+function maskPhoneNumber(value) {
+    if (value.length <= 4) {
+        return '****';
+    }
+
+    return `${value.slice(0, 3)}****${value.slice(-2)}`;
+}
+
 // Connect using a saved session.
 async function connectWithSavedSession() {
     try {
@@ -126,9 +134,9 @@ async function subscribeToChannel() {
 // Confirm the login code on the first run.
 async function signIn() {
     try {
-        console.log("Getting login code...");
+        console.log(`Requesting login code for ${maskPhoneNumber(phoneNumber)}...`);
         await client.start({
-            phoneNumber: phoneNumber,
+            phoneNumber: async () => phoneNumber,
             phoneCode: async () => {
                 const code = await ask('Enter the Telegram code: ');
                 if (code === '') {
