@@ -1,4 +1,4 @@
-if (typeof globalThis.crypto === 'undefined') {
+if (!globalThis.crypto?.randomBytes) {
     globalThis.crypto = require('crypto');
 }
 require('dotenv').config();
