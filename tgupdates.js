@@ -1,3 +1,6 @@
+if (typeof globalThis.crypto === 'undefined') {
+    globalThis.crypto = require('crypto');
+}
 require('dotenv').config();
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
