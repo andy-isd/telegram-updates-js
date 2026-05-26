@@ -119,7 +119,7 @@ async function subscribeToChannel() {
             const timestamp = Math.floor(Date.now() / 1000);
             const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(event.message, removeCircularReferences(), 4), 'utf8');
-        }, new NewMessage({ chats: [channel] }));
+        }, new NewMessage({ chats: [channelUsername] }));
 
     } catch (error) {
         console.error("Error while connecting to the channel:", error);
