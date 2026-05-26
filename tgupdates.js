@@ -115,12 +115,11 @@ async function subscribeToChannel() {
         // Handle new messages.
         client.addEventHandler(async (event) => {
             const message = event.message;
+            console.log(`New message received. Text: ${message.text}`);
             const timestamp = Math.floor(Date.now() / 1000);
             const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(event.message, removeCircularReferences(), 4), 'utf8');
-            //console.log(`Author: ${message.senderId}`);
-            console.log(`Text: ${message.text}`);
-        }, new NewMessage({ chats: [channel.id] }));
+        }, new NewMessage({ chats: [channel] }));
 
     } catch (error) {
         console.error("Error while connecting to the channel:", error);
