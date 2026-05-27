@@ -120,7 +120,7 @@ async function subscribeToChannel(username) {
             const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
             console.log(`Saved: ${filename}`);
-        }, new NewMessage({ chats: [channel.id] }));
+        }, new NewMessage({ chats: [username] }));
 
     } catch (error) {
         console.error(`Error while connecting to channel "${username}":`, error);
