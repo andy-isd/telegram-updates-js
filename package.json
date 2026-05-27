@@ -4,10 +4,11 @@
   "description": "Get updates from a Telegram channel in a Node.js daemon.",
   "main": "tgupdates.js",
   "scripts": {
-    "start": "node tgupdates.js",
+    "run": "node tgupdates.js",
     "check": "node --check tgupdates.js",
-    "pm2:start": "pm2 start ecosystem.config.js",
-    "pm2:stop": "pm2 delete ecosystem.config.js"
+    "start": "pm2 start ecosystem.config.js",
+    "stop": "pm2 delete ecosystem.config.js",
+    "restart": "pm2 restart ecosystem.config.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

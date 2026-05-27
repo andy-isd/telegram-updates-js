@@ -15,15 +15,14 @@ const apiHash = process.env.TELEGRAM_API_HASH?.trim();
 const phoneNumber = process.env.PHONE_NUMBER?.trim();
 const storageDir = path.join(__dirname, 'storage');
 const sessionFile = path.join(storageDir, 'session.dat');
-const channelUsername = process.env.CHANNEL_USERNAME?.trim();  // Channel username or ID
+const channelUsernames = process.env.CHANNEL_USERNAME?.split(',').map(s => s.trim()).filter(Boolean);
 
-if (!apiId || !apiHash || !phoneNumber || !channelUsername) {
+if (!apiId || !apiHash || !phoneNumber || !channelUsernames?.length) {
     console.error('Set TELEGRAM_API_ID, TELEGRAM_API_HASH, PHONE_NUMBER, and CHANNEL_USERNAME in .env');
     process.exit(1);
 }
 
-const folderPath = path.join(storageDir, channelUsername);
-fs.mkdirSync(folderPath, { recursive: true });
+fs.mkdirSync(storageDir, { recursive: true });
 
 function removeCircularReferences() {
     const seen = new Set();
@@ -104,18 +103,18 @@ async function connectWithSavedSession() {
     }
 }
 
-// Subscribe to channel updates.
-async function subscribeToChannel() {
+// Subscribe to a single channel.
+async function subscribeToChannel(username) {
     try {
-        // Get the channel entity.
-        const channel = await client.getEntity(channelUsername);
-        console.log(`Connected to channel: ${channel.title}`);
-        console.log(`Channel ID: ${channel.id}`);
+        const channel = await client.getEntity(username);
+        console.log(`Connected to channel: ${channel.title} (${channel.id})`);
 
-        // Handle new messages.
+        const folderPath = path.join(storageDir, username);
+        fs.mkdirSync(folderPath, { recursive: true });
+
         client.addEventHandler(async (event) => {
             const message = event.message;
-            console.log(`New message — text: ${message?.text}`);
+            console.log(`[${username}] New message — text: ${message?.text}`);
 
             const timestamp = Math.floor(Date.now() / 1000);
             const filename = path.join(folderPath, `event_${timestamp}.json`);
@@ -124,7 +123,7 @@ async function subscribeToChannel() {
         }, new NewMessage({ chats: [channel] }));
 
     } catch (error) {
-        console.error("Error while connecting to the channel:", error);
+        console.error(`Error while connecting to channel "${username}":`, error);
     }
 }
 
@@ -197,7 +196,9 @@ async function checkSession() {
         return;
     }
 
-    await subscribeToChannel();
+    for (const username of channelUsernames) {
+        await subscribeToChannel(username);
+    }
 }
 
 checkSession();
