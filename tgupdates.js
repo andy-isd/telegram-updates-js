@@ -109,18 +109,22 @@ async function subscribeToChannel(username) {
         const channel = await client.getEntity(username);
         console.log(`Connected to channel: ${channel.title} (${channel.id})`);
 
+        const channelId = channel.id.toString();
+
         const folderPath = path.join(storageDir, username);
         fs.mkdirSync(folderPath, { recursive: true });
 
         client.addEventHandler(async (event) => {
             const message = event.message;
+            if (message?.peerId?.channelId?.toString() !== channelId) return;
+
             console.log(`[${username}] New message — text: ${message?.text}`);
 
             const timestamp = Math.floor(Date.now() / 1000);
             const filename = path.join(folderPath, `event_${timestamp}.json`);
             fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
             console.log(`Saved: ${filename}`);
-        }, new NewMessage({ chats: [username] }));
+        }, new NewMessage({}));
 
     } catch (error) {
         console.error(`Error while connecting to channel "${username}":`, error);
