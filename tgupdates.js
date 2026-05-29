@@ -126,6 +126,14 @@ async function resolveChannels() {
     return channelMap;
 }
 
+function saveMessage(info, message) {
+    const filename = path.join(info.folderPath, `event_${message.id}.json`);
+    if (fs.existsSync(filename)) return;
+    console.log(`[${info.username}] New message — text: ${message?.text}`);
+    fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
+    console.log(`Saved: ${filename}`);
+}
+
 function startListening(channelMap) {
     client.addEventHandler(async (event) => {
         const message = event.message;
@@ -135,13 +143,42 @@ function startListening(channelMap) {
         const info = channelMap.get(rawId);
         if (!info) return;
 
-        console.log(`[${info.username}] New message — text: ${message?.text}`);
-
-        const timestamp = Math.floor(Date.now() / 1000);
-        const filename = path.join(info.folderPath, `event_${timestamp}.json`);
-        fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
-        console.log(`Saved: ${filename}`);
+        saveMessage(info, message);
     }, new NewMessage({}));
+}
+
+async function startPolling(channelMap) {
+    const lastIds = new Map();
+
+    for (const [, info] of channelMap) {
+        try {
+            const msgs = await client.getMessages(info.username, { limit: 1 });
+            lastIds.set(info.username, msgs?.[0]?.id ?? 0);
+        } catch (e) {
+            lastIds.set(info.username, 0);
+        }
+    }
+
+    const INTERVAL = 30_000;
+
+    setInterval(async () => {
+        for (const [, info] of channelMap) {
+            try {
+                const minId = lastIds.get(info.username) ?? 0;
+                const msgs = await client.getMessages(info.username, { limit: 10, minId });
+                for (const msg of msgs) {
+                    saveMessage(info, msg);
+                    if (msg.id > (lastIds.get(info.username) ?? 0)) {
+                        lastIds.set(info.username, msg.id);
+                    }
+                }
+            } catch (e) {
+                console.error(`[poll] ${info.username}:`, e.message);
+            }
+        }
+    }, INTERVAL);
+
+    console.log(`Polling ${channelMap.size} channel(s) every ${INTERVAL / 1000}s.`);
 }
 
 // Confirm the login code on the first run.
@@ -224,6 +261,7 @@ async function checkSession() {
     const channelMap = await resolveChannels();
     console.log(`Listening on ${channelMap.size} channel(s).`);
     startListening(channelMap);
+    await startPolling(channelMap);
 }
 
 checkSession();
