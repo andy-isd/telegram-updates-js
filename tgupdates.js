@@ -103,32 +103,45 @@ async function connectWithSavedSession() {
     }
 }
 
-// Subscribe to a single channel.
-async function subscribeToChannel(username) {
-    try {
-        const channel = await client.getEntity(username);
-        console.log(`Connected to channel: ${channel.title} (${channel.id})`);
+async function resolveChannels() {
+    const channelMap = new Map(); // channelId string -> { username, folderPath }
 
-        const channelId = channel.id.toString();
+    for (const username of channelUsernames) {
+        try {
+            const channel = await client.getEntity(username);
+            // Fetch latest message to initialize this channel's PTS in gramJS update state.
+            // Without this, gramJS may not track the channel and miss incoming updates.
+            await client.getMessages(channel, { limit: 1 });
 
-        const folderPath = path.join(storageDir, username);
-        fs.mkdirSync(folderPath, { recursive: true });
+            const folderPath = path.join(storageDir, username);
+            fs.mkdirSync(folderPath, { recursive: true });
+            channelMap.set(channel.id.toString(), { username, folderPath });
 
-        client.addEventHandler(async (event) => {
-            const message = event.message;
-            if (message?.peerId?.channelId?.toString() !== channelId) return;
-
-            console.log(`[${username}] New message — text: ${message?.text}`);
-
-            const timestamp = Math.floor(Date.now() / 1000);
-            const filename = path.join(folderPath, `event_${timestamp}.json`);
-            fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
-            console.log(`Saved: ${filename}`);
-        }, new NewMessage({}));
-
-    } catch (error) {
-        console.error(`Error while connecting to channel "${username}":`, error);
+            console.log(`Connected to channel: ${channel.title} (${channel.id})`);
+        } catch (error) {
+            console.error(`Error connecting to channel "${username}":`, error);
+        }
     }
+
+    return channelMap;
+}
+
+function startListening(channelMap) {
+    client.addEventHandler(async (event) => {
+        const message = event.message;
+        const rawId = (message?.peerId?.channelId ?? message?.peerId?.chatId)?.toString();
+        if (!rawId) return;
+
+        const info = channelMap.get(rawId);
+        if (!info) return;
+
+        console.log(`[${info.username}] New message — text: ${message?.text}`);
+
+        const timestamp = Math.floor(Date.now() / 1000);
+        const filename = path.join(info.folderPath, `event_${timestamp}.json`);
+        fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
+        console.log(`Saved: ${filename}`);
+    }, new NewMessage({}));
 }
 
 // Confirm the login code on the first run.
@@ -200,9 +213,11 @@ async function checkSession() {
         return;
     }
 
-    for (const username of channelUsernames) {
-        await subscribeToChannel(username);
-    }
+    // Load all dialog states so gramJS tracks PTS for every subscribed channel.
+    await client.getDialogs({ limit: 100 });
+
+    const channelMap = await resolveChannels();
+    startListening(channelMap);
 }
 
 checkSession();
