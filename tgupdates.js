@@ -214,9 +214,15 @@ async function checkSession() {
     }
 
     // Load all dialog states so gramJS tracks PTS for every subscribed channel.
-    await client.getDialogs({ limit: 100 });
+    try {
+        await client.getDialogs({ limit: 100 });
+        console.log('Dialogs loaded.');
+    } catch (e) {
+        console.warn('getDialogs failed (non-fatal):', e.message);
+    }
 
     const channelMap = await resolveChannels();
+    console.log(`Listening on ${channelMap.size} channel(s).`);
     startListening(channelMap);
 }
 
