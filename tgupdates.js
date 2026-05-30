@@ -129,7 +129,7 @@ async function resolveChannels() {
 function saveMessage(info, message) {
     const filename = path.join(info.folderPath, `event_${message.id}.json`);
     if (fs.existsSync(filename)) return;
-    console.log(`[${info.username}] New message — text: ${message?.text}`);
+    console.log(`[${info.username}] New message — id: ${message.id}`);
     fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
     console.log(`Saved: ${filename}`);
 }
@@ -159,7 +159,7 @@ async function startPolling(channelMap) {
         }
     }
 
-    const INTERVAL = 30_000;
+    const INTERVAL = 11_000;
 
     setInterval(async () => {
         for (const [, info] of channelMap) {
