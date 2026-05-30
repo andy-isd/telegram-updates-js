@@ -126,12 +126,25 @@ async function resolveChannels() {
     return channelMap;
 }
 
+function extractFields(message) {
+    return {
+        id: message.id,
+        date: message.date,
+        text: message.message ?? null,
+        editDate: message.editDate ?? null,
+        replyToMsgId: message.replyTo?.replyToMsgId ?? null,
+        hasMedia: !!message.media,
+        mediaType: message.media?.className ?? null,
+        views: message.views ?? null,
+        forwards: message.forwards ?? null,
+    };
+}
+
 function saveMessage(info, message) {
     const filename = path.join(info.folderPath, `event_${message.id}.json`);
     if (fs.existsSync(filename)) return;
-    console.log(`[${info.username}] New message — id: ${message.id}`);
-    fs.writeFileSync(filename, JSON.stringify(message, removeCircularReferences(), 4), 'utf8');
-    console.log(`Saved: ${filename}`);
+    fs.writeFileSync(filename, JSON.stringify(extractFields(message), null, 4), 'utf8');
+    console.log(`[${info.username}] ${message.editDate ? 'edit' : 'new'} ${message.id}`);
 }
 
 function startListening(channelMap) {
@@ -160,12 +173,13 @@ async function startPolling(channelMap) {
     }
 
     const INTERVAL = 11_000;
+    const POLL_LIMIT = Math.round(INTERVAL / 1000) * 2;
 
     setInterval(async () => {
-        for (const [, info] of channelMap) {
+        await Promise.all([...channelMap.values()].map(async (info) => {
             try {
                 const minId = lastIds.get(info.username) ?? 0;
-                const msgs = await client.getMessages(info.username, { limit: 10, minId });
+                const msgs = await client.getMessages(info.username, { limit: POLL_LIMIT, minId });
                 for (const msg of msgs) {
                     saveMessage(info, msg);
                     if (msg.id > (lastIds.get(info.username) ?? 0)) {
@@ -175,7 +189,7 @@ async function startPolling(channelMap) {
             } catch (e) {
                 console.error(`[poll] ${info.username}:`, e.message);
             }
-        }
+        }));
     }, INTERVAL);
 
     console.log(`Polling ${channelMap.size} channel(s) every ${INTERVAL / 1000}s.`);
